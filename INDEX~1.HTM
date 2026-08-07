@@ -44,16 +44,10 @@
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { firebaseConfig } from './firebase-config.js';
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const regalosRef = collection(db, 'regalos');
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script>
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let regalos = [];
     let categoriaActiva = 'Todos';
@@ -69,15 +63,27 @@
     const modalTitulo = document.getElementById('modalTitulo');
     const modalError = document.getElementById('modalError');
 
-    onSnapshot(regalosRef, (snap) => {
-      regalos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    async function cargarRegalos() {
+      const { data, error } = await sb.from('regalos').select('*').order('nombre');
+      if (error) {
+        estadoCarga.textContent = 'No se pudo cargar la lista. Revisá la configuración de Supabase (supabase-config.js).';
+        console.error(error);
+        return;
+      }
+      regalos = data;
       estadoCarga.classList.add('hidden');
       renderFiltros();
       render();
-    }, (err) => {
-      estadoCarga.textContent = 'No se pudo cargar la lista. Revisá la configuración de Firebase (firebase-config.js).';
-      console.error(err);
-    });
+    }
+
+    cargarRegalos();
+
+    // Se actualiza sola cuando alguien marca un regalo, sin que haga falta recargar la página
+    sb.channel('regalos-en-vivo')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'regalos' }, () => {
+        cargarRegalos();
+      })
+      .subscribe();
 
     function renderFiltros() {
       const categorias = ['Todos', ...new Set(regalos.map(r => r.categoria || 'Otros'))];
@@ -155,7 +161,7 @@
       if (r.estado === 'comprado') {
         const p = document.createElement('div');
         p.className = 'comprado-por';
-        p.textContent = `Regalado por ${r.compradoPor || 'alguien'} 💛`;
+        p.textContent = `Regalado por ${r.comprado_por || 'alguien'} 💛`;
         card.appendChild(p);
       } else {
         const btn = document.createElement('button');
@@ -186,29 +192,27 @@
         modalError.style.display = 'block';
         return;
       }
-      try {
-        const refDoc = doc(db, 'regalos', regaloSeleccionado.id);
-        await runTransaction(db, async (tx) => {
-          const snap = await tx.get(refDoc);
-          if (!snap.exists() || snap.data().estado !== 'disponible') {
-            throw new Error('YA_TOMADO');
-          }
-          tx.update(refDoc, {
-            estado: 'comprado',
-            compradoPor: nombre,
-            fechaComprado: serverTimestamp(),
-          });
-        });
-        overlay.classList.add('hidden');
-      } catch (e) {
-        if (e.message === 'YA_TOMADO') {
-          modalError.textContent = 'Uy, justo lo acaban de marcar. Elegí otro regalo 🙈';
-        } else {
-          modalError.textContent = 'Hubo un error, probá de nuevo.';
-          console.error(e);
-        }
+      const { data, error } = await sb.rpc('marcar_comprado', {
+        regalo_id: regaloSeleccionado.id,
+        nombre_comprador: nombre,
+      });
+
+      if (error) {
+        modalError.textContent = 'Hubo un error, probá de nuevo.';
+        console.error(error);
         modalError.style.display = 'block';
+        return;
       }
+
+      if (data === false) {
+        modalError.textContent = 'Uy, justo lo acaban de marcar. Elegí otro regalo 🙈';
+        modalError.style.display = 'block';
+        cargarRegalos();
+        return;
+      }
+
+      overlay.classList.add('hidden');
+      cargarRegalos();
     };
 
     overlay.addEventListener('click', (e) => {
