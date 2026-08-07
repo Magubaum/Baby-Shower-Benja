@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /regalos/{regaloId} {
+      // Cualquiera puede ver la lista (no hace falta estar logueado)
+      allow read: if true;
+
+      // Solo vos (logueada como admin) podés crear o borrar regalos
+      allow create, delete: if request.auth != null;
+
+      // Un invitado (sin login) SOLO puede pasar un regalo de "disponible" a "comprado",
+      // y solo puede tocar los campos estado / compradoPor / fechaComprado.
+      // No puede "reabrir" un regalo ni tocar el resto de los datos.
+      allow update: if request.auth != null
+        || (
+          resource.data.estado == 'disponible'
+          && request.resource.data.estado == 'comprado'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'compradoPor', 'fechaComprado'])
+        );
+    }
+  }
+}

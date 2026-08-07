@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panel organizadora — Baby Shower Benja</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="topbar">
+    <h1>🛠️ Panel de la organizadora</h1>
+    <p>Acá cargás, editás y borrás los regalos de la lista.</p>
+  </div>
+
+  <div id="loginBox" class="login-box">
+    <h2>Ingresar</h2>
+    <input type="email" id="loginEmail" placeholder="Tu email" />
+    <input type="password" id="loginPass" placeholder="Contraseña" />
+    <button class="btn btn-comprar" id="btnLogin" style="width:100%;">Entrar</button>
+    <div class="error-msg" id="loginError"></div>
+  </div>
+
+  <div class="admin-wrap hidden" id="adminWrap">
+    <div class="toolbar">
+      <div id="usuarioActual" style="color:var(--texto-suave); font-size:0.85rem;"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-secundario" id="btnSeed">Cargar los 23 regalos iniciales</button>
+        <button class="btn btn-peligro" id="btnLogout">Cerrar sesión</button>
+      </div>
+    </div>
+
+    <form class="form-nuevo" id="formNuevo">
+      <input type="text" id="nNombre" placeholder="Nombre del regalo" required />
+      <input type="text" id="nCategoria" placeholder="Categoría" required />
+      <input type="text" id="nMarcas" placeholder="Marcas / opciones" />
+      <input type="url" id="nReferencia" placeholder="Link de referencia (opcional)" />
+      <input type="text" id="nNotas" placeholder="Notas (opcional)" />
+      <button type="submit" class="btn btn-comprar">+ Agregar regalo</button>
+    </form>
+
+    <div id="estadoCargaAdmin" class="estado-msg">Cargando...</div>
+
+    <table class="admin-tabla hidden" id="tabla">
+      <thead>
+        <tr>
+          <th>Regalo</th>
+          <th>Categoría</th>
+          <th>Marcas</th>
+          <th>Referencia</th>
+          <th>Estado</th>
+          <th>Comprado por</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tablaBody"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { firebaseConfig } from './firebase-config.js';
+    import { SEED_REGALOS } from './seed-data.js';
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const regalosRef = collection(db, 'regalos');
+
+    const loginBox = document.getElementById('loginBox');
+    const adminWrap = document.getElementById('adminWrap');
+    const loginError = document.getElementById('loginError');
+    const usuarioActual = document.getElementById('usuarioActual');
+    const tabla = document.getElementById('tabla');
+    const tablaBody = document.getElementById('tablaBody');
+    const estadoCargaAdmin = document.getElementById('estadoCargaAdmin');
+
+    document.getElementById('btnLogin').onclick = async () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      loginError.textContent = '';
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (e) {
+        loginError.textContent = 'Email o contraseña incorrectos.';
+      }
+    };
+
+    document.getElementById('btnLogout').onclick = () => signOut(auth);
+
+    let unsub = null;
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loginBox.classList.add('hidden');
+        adminWrap.classList.remove('hidden');
+        usuarioActual.textContent = `Conectada como ${user.email}`;
+        if (!unsub) unsub = onSnapshot(regalosRef, (snap) => {
+          estadoCargaAdmin.classList.add('hidden');
+          tabla.classList.remove('hidden');
+          renderTabla(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+      } else {
+        loginBox.classList.remove('hidden');
+        adminWrap.classList.add('hidden');
+      }
+    });
+
+    function renderTabla(regalos) {
+      tablaBody.innerHTML = '';
+      regalos.forEach(r => {
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td><input data-field="nombre" value="${escapeAttr(r.nombre || '')}" /></td>
+          <td><input data-field="categoria" value="${escapeAttr(r.categoria || '')}" /></td>
+          <td><input data-field="marcas" value="${escapeAttr(r.marcas || '')}" /></td>
+          <td><input data-field="referencia" value="${escapeAttr(r.referencia || '')}" /></td>
+          <td>
+            <select data-field="estado">
+              <option value="disponible" ${r.estado === 'disponible' ? 'selected' : ''}>Disponible</option>
+              <option value="comprado" ${r.estado === 'comprado' ? 'selected' : ''}>Comprado</option>
+            </select>
+          </td>
+          <td><input data-field="compradoPor" value="${escapeAttr(r.compradoPor || '')}" /></td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-secundario btn-guardar" style="padding:6px 10px; font-size:0.75rem;">Guardar</button>
+            <button class="btn btn-peligro btn-borrar" style="padding:6px 10px; font-size:0.75rem;">Borrar</button>
+          </td>
+        `;
+
+        tr.querySelector('.btn-guardar').onclick = async () => {
+          const data = {};
+          tr.querySelectorAll('[data-field]').forEach(el => data[el.dataset.field] = el.value);
+          await updateDoc(doc(db, 'regalos', r.id), data);
+        };
+
+        tr.querySelector('.btn-borrar').onclick = async () => {
+          if (confirm(`¿Borrar "${r.nombre}" de la lista?`)) {
+            await deleteDoc(doc(db, 'regalos', r.id));
+          }
+        };
+
+        tablaBody.appendChild(tr);
+      });
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    }
+
+    document.getElementById('formNuevo').onsubmit = async (e) => {
+      e.preventDefault();
+      await addDoc(regalosRef, {
+        nombre: document.getElementById('nNombre').value.trim(),
+        categoria: document.getElementById('nCategoria').value.trim(),
+        marcas: document.getElementById('nMarcas').value.trim() || null,
+        referencia: document.getElementById('nReferencia').value.trim() || null,
+        notas: document.getElementById('nNotas').value.trim() || null,
+        estado: 'disponible',
+        compradoPor: null,
+      });
+      e.target.reset();
+    };
+
+    document.getElementById('btnSeed').onclick = async () => {
+      const existentes = await getDocs(regalosRef);
+      if (existentes.size > 0) {
+        if (!confirm(`Ya hay ${existentes.size} regalos cargados. ¿Agregar de nuevo los 23 iniciales igual? (puede duplicar)`)) return;
+      } else {
+        if (!confirm('Se van a cargar los 23 regalos iniciales de tu Excel. ¿Confirmás?')) return;
+      }
+      for (const item of SEED_REGALOS) {
+        await addDoc(regalosRef, item);
+      }
+      alert('Listo, se cargaron los regalos iniciales.');
+    };
+  </script>
+</body>
+</html>
