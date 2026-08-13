@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Panel organizadora — Baby Shower Benja</title>
+<title>Panel organizadora — Benja Fest</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -25,7 +25,7 @@
     <div class="toolbar">
       <div id="usuarioActual" style="color:var(--texto-suave); font-size:0.85rem;"></div>
       <div style="display:flex; gap:10px;">
-        <button class="btn btn-secundario" id="btnSeed">Cargar los 23 regalos iniciales</button>
+        <button class="btn btn-secundario" id="btnSeed">Cargar lista desde el Excel</button>
         <button class="btn btn-peligro" id="btnLogout">Cerrar sesión</button>
       </div>
     </div>
@@ -179,13 +179,13 @@
     document.getElementById('btnSeed').onclick = async () => {
       const { count } = await sb.from('regalos').select('*', { count: 'exact', head: true });
       if (count > 0) {
-        if (!confirm(`Ya hay ${count} regalos cargados. ¿Agregar de nuevo los 23 iniciales igual? (puede duplicar)`)) return;
+        if (!confirm(`Ya hay ${count} regalos cargados. Esto va a AGREGAR ${SEED_REGALOS.length} más (puede duplicar si ya estaban). Si querés reemplazar la lista entera, primero borrala desde el SQL Editor de Supabase. ¿Agregar igual?`)) return;
       } else {
-        if (!confirm('Se van a cargar los 23 regalos iniciales de tu Excel. ¿Confirmás?')) return;
+        if (!confirm(`Se van a cargar los ${SEED_REGALOS.length} regalos del Excel. ¿Confirmás?`)) return;
       }
       const { error } = await sb.from('regalos').insert(SEED_REGALOS);
       if (error) { alert('No se pudo cargar: ' + error.message); console.error(error); return; }
-      alert('Listo, se cargaron los regalos iniciales.');
+      alert('Listo, se cargó la lista.');
     };
   </script>
 </body>

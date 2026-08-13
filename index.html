@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Baby Shower Benja 🍼</title>
+<title>Benja Fest 🍼</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <div class="topbar">
-    <h1>🍼 Baby Shower Benja</h1>
-    <p>Elegí un regalo y marcalo como tuyo. Apenas lo hacés, se bloquea para que no se repita.</p>
+    <h1>🍼 Benja Fest</h1>
+    <p>Hola todos! Estas son algunas de las sugerencias que nos fueron anticipando que vamos a tener. Elegí el que quieras y hacé click en "Yo me encargo!" así se bloquea, muchas gracias!</p>
   </div>
 
   <div class="contenedor">
@@ -141,13 +141,6 @@
         card.appendChild(p);
       }
 
-      if (r.notas) {
-        const p = document.createElement('div');
-        p.className = 'notas';
-        p.textContent = r.notas;
-        card.appendChild(p);
-      }
-
       if (r.referencia) {
         const a = document.createElement('a');
         a.className = 'link-ref';
@@ -166,7 +159,7 @@
       } else {
         const btn = document.createElement('button');
         btn.className = 'btn btn-comprar';
-        btn.textContent = '🎁 Marcar como comprado';
+        btn.textContent = 'Yo me encargo!';
         btn.onclick = () => abrirModal(r);
         card.appendChild(btn);
       }
