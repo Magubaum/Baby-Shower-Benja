@@ -10,7 +10,7 @@
 
   <div class="topbar">
     <h1>🍼 Benja Fest</h1>
-    <p>Hola todos! Estas son algunas de las sugerencias que nos fueron anticipando que vamos a tener. Elegí el que quieras y hacé click en "Yo me encargo!" así se bloquea, muchas gracias!</p>
+    <p>Hola todos! Estas son algunas de las sugerencias que nos fueron anticipando que vamos a necesitar. Elegí el que quieras y hacé click en "Yo me encargo!" así se bloquea, muchas gracias!</p>
   </div>
 
   <div class="contenedor">
@@ -36,6 +36,7 @@
       <h3 id="modalTitulo">¿Vas a regalar esto?</h3>
       <p style="color:var(--texto-suave); font-size:0.9rem; margin-top:-6px;">Contanos tu nombre para que sepamos a quién agradecer 💛</p>
       <input type="text" id="inputNombre" placeholder="Tu nombre" maxlength="60" />
+      <input type="text" id="inputParentesco" placeholder="Parentesco o cómo la conocés (opcional)" maxlength="60" />
       <div class="estado-msg" id="modalError" style="padding:0 0 10px; color:#B23A3A; display:none;"></div>
       <div class="modal-acciones">
         <button class="btn btn-secundario" id="btnCancelar">Cancelar</button>
@@ -60,6 +61,7 @@
     const progresoTexto = document.getElementById('progresoTexto');
     const overlay = document.getElementById('overlay');
     const inputNombre = document.getElementById('inputNombre');
+    const inputParentesco = document.getElementById('inputParentesco');
     const modalTitulo = document.getElementById('modalTitulo');
     const modalError = document.getElementById('modalError');
 
@@ -126,7 +128,7 @@
       if (r.estado === 'comprado') {
         const ribbon = document.createElement('span');
         ribbon.className = 'ribbon-comprado';
-        ribbon.textContent = '✅ Comprado';
+        ribbon.textContent = '✅ Reservado';
         card.appendChild(ribbon);
       }
 
@@ -154,7 +156,8 @@
       if (r.estado === 'comprado') {
         const p = document.createElement('div');
         p.className = 'comprado-por';
-        p.textContent = `Regalado por ${r.comprado_por || 'alguien'} 💛`;
+        const sinNombre = !r.comprado_por || r.comprado_por.trim().toLowerCase() === 'ya resuelto';
+        p.textContent = sinNombre ? 'Reservado' : `${r.comprado_por} 💛`;
         card.appendChild(p);
       } else {
         const btn = document.createElement('button');
@@ -171,6 +174,7 @@
       regaloSeleccionado = r;
       modalTitulo.textContent = `¿Vas a regalar "${r.nombre}"?`;
       inputNombre.value = '';
+      inputParentesco.value = '';
       modalError.style.display = 'none';
       overlay.classList.remove('hidden');
       inputNombre.focus();
@@ -180,14 +184,16 @@
 
     document.getElementById('btnConfirmar').onclick = async () => {
       const nombre = inputNombre.value.trim();
+      const parentesco = inputParentesco.value.trim();
       if (!nombre) {
         modalError.textContent = 'Necesitamos tu nombre para confirmar.';
         modalError.style.display = 'block';
         return;
       }
+      const nombreCompleto = parentesco ? `${nombre} (${parentesco})` : nombre;
       const { data, error } = await sb.rpc('marcar_comprado', {
         regalo_id: regaloSeleccionado.id,
-        nombre_comprador: nombre,
+        nombre_comprador: nombreCompleto,
       });
 
       if (error) {
